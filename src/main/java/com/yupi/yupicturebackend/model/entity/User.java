@@ -12,9 +12,9 @@ import java.util.Date;
 @TableName(value ="user")
 public class User {
     /**
-     * id
+     * id(要指定主键策略)
      */
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
@@ -63,7 +63,7 @@ public class User {
     private Date updateTime;
 
     /**
-     * 是否删除
+     * 是否删除(逻辑删除 0代表未删除 1代表已删除)
      */
     private Integer isDelete;
 

@@ -4,8 +4,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import java.io.Serializable;
-
 /**
  * Class name: CorConfig
  * Package: com.yupi.yupicturebackend.config
@@ -16,7 +14,7 @@ import java.io.Serializable;
  * @Version: 1.0
  */
 @Configuration
-public class CorConfig implements WebMvcConfigurer {
+public class CorsConfig implements WebMvcConfigurer {
 
     public void addCorsMappings(CorsRegistry registry) {
         // 覆盖所有请求
