@@ -1,44 +1,38 @@
-package com.yupi.yupicturebackend.model.dto;
+package com.yupi.yupicturebackend.model.dto.user;
 
 import lombok.Data;
 
 import java.io.Serializable;
 
 /**
- * Class name: UserRegisterRequest
+ * Class name: UserLoginRequest
  * Package: com.yupi.yupicturebackend.model.dto
  * Description:
  *
- * @Create: 2025/5/6 17:42
+ * @Create: 2025/5/6 19:57
  * @Author: jay
  * @Version: 1.0
  */
 
 /**
- * 用户注册请求体
+ * 用户登录请求
  */
 @Data
-public class UserRegisterRequest implements Serializable {
-
+public class UserLoginRequest implements Serializable {
     /**
      * 序列化ID
      */
     private static final long serialVersionUID = 1L;
 
     /**
-     * 账号
+     * 登录账户
      */
     private String userAccount;
 
     /**
-     * 密码
+     * 登录密码
      */
     private String userPassword;
-
-    /**
-     * 确认密码
-     */
-    private String checkPassword;
 
 }
 

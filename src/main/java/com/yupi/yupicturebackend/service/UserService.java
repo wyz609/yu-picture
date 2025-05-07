@@ -1,10 +1,14 @@
 package com.yupi.yupicturebackend.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.yupi.yupicturebackend.model.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.yupi.yupicturebackend.model.dto.user.UserQueryRequest;
 import com.yupi.yupicturebackend.model.vo.LoginUserVO;
+import com.yupi.yupicturebackend.model.vo.UserVO;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
 * @author jay
@@ -58,4 +62,32 @@ public interface UserService extends IService<User> {
      * @return 是否注销成功
      */
     boolean userLogout(HttpServletRequest request);
+
+    /**
+     * 获取脱敏的用户信息
+     * @param user 用户信息
+     * @return 脱敏后的用户信息
+     */
+    UserVO getUserVO(User user);
+
+    /**
+     * 获取脱敏的用户列表
+     * @param userList 用户列表
+     * @return 脱敏后的用户列表
+     */
+    List<UserVO> getUserVOList(List<User> userList);
+
+    /**
+     * 将用户查询请求转换为查询条件
+     * @param userQueryRequest 用户查询请求
+     * @return 查询条件
+     */
+    QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
+
+    /**
+     * 删除用户
+     * @param id 用户id
+     * @return  是否删除成功
+     */
+    Boolean deleteUser(long id);
 }

@@ -69,7 +69,7 @@ public class AuthInterceptor {
         if(userRoleEnum == null){
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
-        // 要求必须有管理员全新，但用户没有管理员权限，所以会被拒绝
+        // 要求必须有管理员权限，但用户没有管理员权限，所以会被拒绝
         if(UserRoleEnum.ADMIN.equals(mustRoleEnum) && !UserRoleEnum.ADMIN.equals(userRoleEnum)){
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }

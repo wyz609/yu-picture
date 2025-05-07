@@ -1,14 +1,19 @@
 package com.yupi.yupicturebackend.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yupi.yupicturebackend.constant.UserConstant;
 import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
+import com.yupi.yupicturebackend.exception.ThrowUtils;
+import com.yupi.yupicturebackend.model.dto.user.UserQueryRequest;
 import com.yupi.yupicturebackend.model.entity.User;
 import com.yupi.yupicturebackend.model.enums.UserRoleEnum;
 import com.yupi.yupicturebackend.model.vo.LoginUserVO;
+import com.yupi.yupicturebackend.model.vo.UserVO;
 import com.yupi.yupicturebackend.service.UserService;
 import com.yupi.yupicturebackend.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import javax.servlet.http.HttpServletRequest;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.yupi.yupicturebackend.constant.UserConstant.USER_LOGIN_STATE;
 
@@ -172,6 +180,118 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 移除登录态
         return true;
     }
+
+    /**
+     * 获取单个用户脱敏后的数据
+     * @param user
+     * @return
+     */
+    @Override
+    public UserVO getUserVO(User user) {
+        if(user == null){
+            return null;
+        }
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user,userVO);
+        return userVO;
+    }
+
+    /**
+     * 获取多个用户脱敏后的数据
+     * @param userList 用户原始数据列表
+     * @return 脱敏后的用户数据列表
+     */
+    @Override
+    public List<UserVO> getUserVOList(List<User> userList) {
+        // 检查输入列表是否为空或null，如果是，则直接返回空列表
+        if (CollUtil.isEmpty(userList)) {
+            return Collections.emptyList();
+        }
+
+        // 使用流处理，过滤掉null值，并将每个用户对象映射为脱敏后的用户视图对象
+        return userList.stream()
+                .filter(Objects::nonNull)
+                .map(this::getUserVO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 将查询条件转为QueryWrapper对象
+     *
+     * @param userQueryRequest 用户查询请求
+     * @return QueryWrapper<User>
+     */
+    @Override
+    public QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest) {
+        // 检查用户查询请求是否为空
+        if (userQueryRequest == null) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "请求参数为空");
+        }
+
+        // 获取查询条件参数
+        Long id = userQueryRequest.getId();
+        String userAccount = userQueryRequest.getUserAccount();
+        String userName = userQueryRequest.getUserName();
+        String userProfile = userQueryRequest.getUserProfile();
+        String userRole = userQueryRequest.getUserRole();
+        String sortField = userQueryRequest.getSortField();
+        String sortOrder = userQueryRequest.getSortOrder();
+
+        // 创建查询包装器对象
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+
+        // 添加查询条件：精确匹配id
+        queryWrapper.eq(ObjUtil.isNotEmpty(id), "id", id);
+
+        // 添加查询条件：精确匹配用户角色
+        queryWrapper.eq(StrUtil.isNotBlank(userRole), "userRole", userRole);
+
+        // 添加查询条件：模糊匹配用户账号
+        queryWrapper.like(StrUtil.isNotBlank(userAccount), "userAccount", userAccount);
+
+        // 添加查询条件：模糊匹配用户昵称
+        queryWrapper.like(StrUtil.isNotBlank(userName), "userName", userName);
+
+        // 添加查询条件：模糊匹配用户简介
+        queryWrapper.like(StrUtil.isNotBlank(userProfile), "userProfile", userProfile);
+
+        // 白名单校验排序字段
+        Set<String> allowedSortFields = new HashSet<>(Arrays.asList("id", "userAccount", "userName", "userRole", "createTime"));
+        if (StrUtil.isNotEmpty(sortField) && allowedSortFields.contains(sortField)) {
+            boolean isAsc = StrUtil.equals(sortOrder, "ascend");
+            queryWrapper.orderBy(true, isAsc, sortField);
+        }
+        // 返回查询包装器对象
+        return queryWrapper;
+    }
+
+    /**
+     * 删除用户
+     * @param id 用户id
+     * @return 是否删除成功
+     */
+    @Override
+    public Boolean deleteUser(long id) {
+        // 参数校验
+        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
+        // 可选：添加日志记录
+        log.info("Deleting user with ID: {}", id);
+
+        // 执行删除操作并处理可能的异常
+        try {
+            boolean result = this.removeById(id);
+            if (!result) {
+                log.warn("User deletion failed for ID: {}", id);
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "用户删除失败");
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("Error occurred while deleting user with ID: {}", id, e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "系统异常，请稍后重试");
+        }
+    }
+
+
 }
 
 
