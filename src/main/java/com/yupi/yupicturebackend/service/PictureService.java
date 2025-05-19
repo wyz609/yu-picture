@@ -1,0 +1,65 @@
+package com.yupi.yupicturebackend.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.yupi.yupicturebackend.model.dto.picture.PictureQueryRequest;
+import com.yupi.yupicturebackend.model.dto.picture.PictureUploadRequest;
+import com.yupi.yupicturebackend.model.entity.Picture;
+import com.yupi.yupicturebackend.model.entity.User;
+import com.yupi.yupicturebackend.model.vo.PictureVO;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletRequest;
+
+/**
+* @author jay
+* @description 针对表【picture(图片)】的数据库操作Service
+* @createDate 2025-05-18 14:11:28
+*/
+public interface PictureService extends IService<Picture> {
+
+//    QueryWrapper<Picture> queryWrapper = new QueryWrapper<>();
+    /**
+     * 上传图片
+     *
+     * @param multipartFile
+     * @param pictureUploadRequest
+     * @param loginUser
+     * @return
+     */
+    PictureVO uploadPicture(MultipartFile multipartFile,
+                            PictureUploadRequest pictureUploadRequest,
+                            User loginUser);
+
+
+    /**
+     * 获取查询的 queryWrapper
+     * @param pictureQueryRequest 图片请求类
+     * @return 可用来查询的 queryWrapper
+     */
+    QueryWrapper<Picture> getQueryWrapper(PictureQueryRequest pictureQueryRequest);
+
+    /**
+     * 获取单个图片的vo对象
+     * @param picture picture对象
+     * @param request http请求
+     * @return 对应图片的vo
+     */
+    PictureVO getPictureVO(Picture picture, HttpServletRequest request);
+
+    /**
+     * 分页获取图片VO对象
+     * @param picturePage page对象
+     * @param request request请求
+     * @return 分页的VO
+     */
+    Page<PictureVO> getPictureVOPage(Page<Picture> picturePage, HttpServletRequest request);
+
+    /**
+     * 图片校验，用于更新和修改图片时进行判断
+     * @param picture 图片
+     */
+    void validPicture(Picture picture);
+
+}

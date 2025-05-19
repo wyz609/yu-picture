@@ -90,4 +90,11 @@ public interface UserService extends IService<User> {
      * @return  是否删除成功
      */
     Boolean deleteUser(long id);
+
+    /**
+     * 是否为管理员
+     * @param user 用户信息
+     * @return 是否为管理员
+     */
+    boolean isAdmin(User user);
 }

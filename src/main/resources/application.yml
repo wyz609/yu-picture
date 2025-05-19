@@ -6,15 +6,23 @@ server:
 
 #这里配置Spring项目的名称
 spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
   application:
     name: yu-picture-backend
-
   datasource:
 #    在新版的mysql中尽量使用新的驱动库的路径
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
     password: 20040609
     url: jdbc:mysql://localhost:3306/yupicture
+  profiles:
+    active: local
+  config:
+    import: optional:classpath:application-local.yml
+
+
 mybatis-plus:
   configuration:
 #    关闭驼峰命名法
@@ -38,3 +46,7 @@ knife4j:
         api-rule: package
         api-rule-resources:
           - com.yupi.yupicturebackend.controller
+cos:
+  client:
+    host: ${}
+

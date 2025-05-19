@@ -83,11 +83,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     public String getEncryptPassword(String userPassword) {
-        /**
+        /*
          * 为原本的密码加盐
          * 盐值，混淆密码
          */
-        final String SALT = "wenyang";
+        final String SALT = "wen yang";
         return DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
     }
 
@@ -145,7 +145,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     /**
      * 获取当前登录用户
      * @param request 请求
-     * @return
+     * @return 当前登录用户
      */
     @Override
     public User getLoginUser(HttpServletRequest request) {
@@ -183,8 +183,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     /**
      * 获取单个用户脱敏后的数据
-     * @param user
-     * @return
+     * @param user 用户原始数据
+     * @return 脱敏后的用户数据
      */
     @Override
     public UserVO getUserVO(User user) {
@@ -289,6 +289,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             log.error("Error occurred while deleting user with ID: {}", id, e);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "系统异常，请稍后重试");
         }
+    }
+
+    /**
+     * 判断用户是否为管理员用户
+     * @param user 用户信息
+     * @return 是否为管理员
+     */
+    @Override
+    public boolean isAdmin(User user) {
+        return user != null && UserRoleEnum.ADMIN.getValue().equals(user.getUserRole());
     }
 
 
