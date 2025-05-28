@@ -48,6 +48,12 @@ public class PictureVO implements Serializable {
 
     private UserVO user;
 
+    private Integer picWidth;
+
+    private String picFormat;
+
+    private Date editTime;
+
     private static final long serialVersionUID = 1L;
 
     /**
@@ -81,6 +87,7 @@ public class PictureVO implements Serializable {
         BeanUtil.copyProperties(picture,pictureVO);
         // 类型不同，需要转换
         pictureVO.setTages(JSONUtil.toList(picture.getTags(),String.class));
+        System.out.println("pictureVO =====> " + pictureVO);
         return pictureVO;
     }
 

@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * Class name: PictureTagCategory
  * Package: com.yupi.yupicturebackend.model.entity
- * Description:
+ * Description: 图片标签分类列表视图对象
  *
  * @Create: 2025/5/19 22:20
  * @Author: jay

@@ -32,7 +32,6 @@ public interface PictureService extends IService<Picture> {
                             PictureUploadRequest pictureUploadRequest,
                             User loginUser);
 
-
     /**
      * 获取查询的 queryWrapper
      * @param pictureQueryRequest 图片请求类

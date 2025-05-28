@@ -40,6 +40,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/picture")
+@CrossOrigin
 public class PictureController {
 
     @Resource
@@ -56,10 +57,12 @@ public class PictureController {
      * @return
      */
     @PostMapping("/upload")
+    @ApiOperation("上传图片")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<PictureVO> uploadPicture(@RequestPart("file") MultipartFile multipartFile,
                                                  PictureUploadRequest pictureUploadRequest,
                                                  HttpServletRequest request){
+        System.out.println("PictureUploadRequest ====>"  + pictureUploadRequest);
         User loginUser = userService.getLoginUser(request);
         PictureVO pictureVO = pictureService.uploadPicture(multipartFile, pictureUploadRequest, loginUser);
         return ResultUtils.success(pictureVO);
@@ -100,6 +103,7 @@ public class PictureController {
      */
 
     @PostMapping("/update")
+    @ApiOperation("更新图片")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest){
         if(pictureUpdateRequest == null || pictureUpdateRequest.getId() <= 0){
@@ -131,6 +135,7 @@ public class PictureController {
      * @return
      */
     @GetMapping("/get")
+    @ApiOperation("根据ID获取图片")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Picture> getPictureById(long id, HttpServletRequest request){
         ThrowUtils.throwIf(id <= 0, ErrorCode.NOT_FOUND_ERROR);
@@ -148,9 +153,11 @@ public class PictureController {
      * @return
      */
     @GetMapping("/get/vo")
+    @ApiOperation("根据ID获取图片封装类")
     public BaseResponse<PictureVO> getPictureVOById(long id, HttpServletRequest request){
         ThrowUtils.throwIf(id<= 0,ErrorCode.NOT_FOUND_ERROR);
         Picture picture = pictureService.getById(id);
+        System.out.println("picture ====> " + picture);
         ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR);
         // 获取封装类
         return ResultUtils.success(pictureService.getPictureVO(picture, request));
@@ -162,6 +169,7 @@ public class PictureController {
      * @return
      */
     @PostMapping("/list/page")
+    @ApiOperation("分页获取图片列表")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<Picture>> listPictureByPage(@RequestBody PictureQueryRequest pictureQueryRequest){
         int current = pictureQueryRequest.getCurrent();
@@ -176,6 +184,7 @@ public class PictureController {
      * 分页获取图片列表（封装类）
      */
     @PostMapping("/list/page/vo")
+    @ApiOperation("分页获取图片列表封装类")
     public BaseResponse<Page<PictureVO>> listPictureVOByPage(@RequestBody PictureQueryRequest pictureQueryRequest,
                                                              HttpServletRequest request) {
         long current = pictureQueryRequest.getCurrent();
@@ -197,7 +206,8 @@ public class PictureController {
      * @return
      */
     @PostMapping("/edit")
-    public BaseResponse<Boolean> editPicture(PictureEditRequest pictureEditRequest,HttpServletRequest request){
+    @ApiOperation("编辑图片")
+    public BaseResponse<Boolean> editPicture(@RequestBody PictureEditRequest pictureEditRequest,HttpServletRequest request){
         if(pictureEditRequest == null || pictureEditRequest.getId() <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -215,7 +225,7 @@ public class PictureController {
         // 判断是否存在
         Long id = pictureEditRequest.getId();
         Picture oldPicture = pictureService.getById(id);
-        ThrowUtils.throwIf(oldPicture != null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
 
         if(!oldPicture.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)){
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
@@ -232,6 +242,7 @@ public class PictureController {
      * @return
      */
     @GetMapping("/tag_category")
+    @ApiOperation("获取预置标签和分类")
     public BaseResponse<PictureTagCategory> listPictureTagCategory() {
         PictureTagCategory pictureTagCategory = new PictureTagCategory();
         List<String> tagList = Arrays.asList("热门", "搞笑", "生活", "高清", "艺术", "校园", "背景", "简历", "创意");

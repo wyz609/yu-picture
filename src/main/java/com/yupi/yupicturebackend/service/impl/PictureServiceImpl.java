@@ -47,39 +47,45 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     /**
      * 上传图片功能
-     * @param multipartFile
-     * @param pictureUploadRequest
-     * @param loginUser
-     * @return
+     * 该方法允许用户上传图片，无论是新增还是更新图片
+     * @param multipartFile 用户选择的图片文件
+     * @param pictureUploadRequest 包含上传图片的请求信息，如图片ID
+     * @param loginUser 当前登录的用户信息，用于验证身份和确定存储路径
+     * @return 返回上传后的图片信息，包括URL等
      */
-    @Override
-    public PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest, User loginUser) {
-        ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
-        // 用于判断是新增还是更新图片
-        Long pictureId = null;
-        if(pictureUploadRequest != null){
-           pictureId = pictureUploadRequest.getId();
-        }
-
-        if(pictureId != null){
-            boolean exists = this.lambdaQuery()
-                    .eq(Picture::getId,pictureId)
-                    .exists();
-            ThrowUtils.throwIf(!exists,ErrorCode.NOT_FOUND_ERROR,"图片不存在");
-        }
-
-        // 上传图片
-        // 按照用户id划分目录
-        String uploadPathPrefix = String.format("public/%s", loginUser.getId());
-        UploadPictureResult uploadPictureResult = fileManager.uploadPicture(multipartFile, uploadPathPrefix);
-        // 构造要入库的图片信息
-        Picture picture = getPicture(loginUser, uploadPictureResult, pictureId);
-
-        boolean result = this.saveOrUpdate(picture);
-        ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"图片上传失败");
-
-        return PictureVO.objToVo(picture);
+@Override
+public PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest, User loginUser) {
+    // 校验参数
+    ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
+    // 用于判断是新增还是更新图片
+    Long pictureId = null;
+    if(pictureUploadRequest != null){
+       pictureId = pictureUploadRequest.getId();
     }
+
+    // 如果是更新图片，确认图片是否存在
+    if(pictureId != null){
+        boolean exists = this.lambdaQuery()
+                .eq(Picture::getId,pictureId)
+                .exists();
+        ThrowUtils.throwIf(!exists,ErrorCode.NOT_FOUND_ERROR,"图片不存在");
+    }
+
+    // 上传图片
+    // 按照用户id划分目录，以确保用户只能上传图片到自己的目录中
+    String uploadPathPrefix = String.format("public/%s", loginUser.getId());
+    UploadPictureResult uploadPictureResult = fileManager.uploadPicture(multipartFile, uploadPathPrefix);
+    // 构造要入库的图片信息
+    Picture picture = getPicture(loginUser, uploadPictureResult, pictureId);
+
+    // 保存或更新图片信息到数据库
+    boolean result = this.saveOrUpdate(picture);
+    ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"图片上传失败");
+
+    // 返回上传后的图片信息
+    return PictureVO.objToVo(picture);
+}
+
 
     @Override
     public QueryWrapper<Picture> getQueryWrapper(PictureQueryRequest pictureQueryRequest) {
@@ -198,23 +204,44 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
     }
 
+    /**
+     * 根据用户信息和上传图片结果创建或更新图片对象
+     *
+     * @param loginUser 当前登录的用户，用于关联图片与用户
+     * @param uploadPictureResult 图片上传结果，包含图片的各种信息
+     * @param pictureId 图片ID，如果为null表示新增图片，否则表示更新现有图片
+     * @return 返回一个新的图片对象，或者更新后的图片对象
+     */
     private static Picture getPicture(User loginUser, UploadPictureResult uploadPictureResult, Long pictureId) {
+        // 创建一个新的图片对象
         Picture picture = new Picture();
+        // 设置图片的URL
         picture.setUrl(uploadPictureResult.getUrl());
+        // 设置图片的名称
         picture.setName(uploadPictureResult.getPicName());
+        // 设置图片的大小
         picture.setPicSize(uploadPictureResult.getPicSize());
+        // 设置图片的宽度
         picture.setPicWidth(uploadPictureResult.getPicWidth());
+        // 设置图片的高度
         picture.setPicHeight(uploadPictureResult.getPicHeight());
+        // 设置图片的缩放比例
         picture.setPicScale(uploadPictureResult.getPicScale());
+        // 设置图片的格式
         picture.setPicFormat(uploadPictureResult.getPicFormat());
+        // 设置图片所属的用户ID
         picture.setUserId(loginUser.getId());
 
         // 如果pictureId不为空，表示更新，否则是新增
         if(pictureId != null){
+            // 打印更新图片的信息
+            System.out.println("更新图片，ID: " + pictureId);
             // 如果是更新，需要补充id和编辑时间
             picture.setId(pictureId);
             picture.setEditTime(new Date());
         }
+        System.out.println("上传图片信息: " + picture);
+        // 返回图片对象
         return picture;
     }
 

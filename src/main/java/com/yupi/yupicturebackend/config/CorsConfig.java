@@ -16,6 +16,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
 
+    @Override
     public void addCorsMappings(CorsRegistry registry) {
         // 覆盖所有请求
         registry.addMapping("/**")
@@ -23,6 +24,7 @@ public class CorsConfig implements WebMvcConfigurer {
                 .allowCredentials(true)
                 // 放行哪些域名(必须用 patterns，否则 * 会和 allowCredentials冲突)
                 .allowedOriginPatterns("*")
+                .allowedOrigins("http://localhost:5173")
                 .allowedHeaders("*")
                 .exposedHeaders("*")
                 .allowedMethods("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS");

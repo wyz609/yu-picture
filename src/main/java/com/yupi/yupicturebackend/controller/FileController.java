@@ -20,7 +20,7 @@ import java.io.File;
 /**
  * Class name: FileController
  * Package: com.yupi.yupicturebackend.controller
- * Description:
+ * Description: 该文件上传控制器提供一个测试文件上传的接口
  *
  * @Create: 2025/5/18 14:33
  * @Author: jay

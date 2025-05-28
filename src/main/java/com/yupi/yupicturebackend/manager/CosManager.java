@@ -15,7 +15,7 @@ import java.io.File;
 /**
  * Class name: CosManager
  * Package: com.yupi.yupicturebackend.manager
- * Description:
+ * Description: 提供了三个方法和一个辅助方法，分别用于上传普通文件，
  *
  * @Create: 2025/5/18 14:08
  * @Author: jay
@@ -25,28 +25,30 @@ import java.io.File;
 @Component
 public class CosManager {
 
+    // 自定义配置类，包含COS的配置信息(如存储桶名称Bucket，地域，密钥等)
     @Resource
     private CosClientConfig cosClientConfig;
 
+    // COS客户端对象，用于与COS服务进行交互，用于执行上传、下载等操作
     @Resource
     private COSClient cosClient;
 
 
     /**
-     * 上传对象
-     * @param key 唯一键
-     * @param file 文件
-     * @return PutObjectResult
+     * 上传普通文件到腾讯云COS
+     *
+     * @param key  文件的唯一标识(对象键),在COS中作为文件的路径和名称(如images/photo.jpg)
+     * @param file 本地文件对象，表示要上传的文件
      */
-    public PutObjectResult putObject(String key, File file){
+    public void putObject(String key, File file){
         PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key, file);
-        return cosClient.putObject(putObjectRequest);
+        cosClient.putObject(putObjectRequest);
     }
 
     /**
-     * 上传图片对象
-     * @param key 唯一键
-     * @param file 文件
+     * 上传图片文件到COS，并启用图片处理功能
+     * @param key 图片文件的对象键
+     * @param file 本地图片文件
      * @return PutObjectResult
      */
     public PutObjectResult putPictureObject(String key, File file){
@@ -72,7 +74,9 @@ public class CosManager {
 
 
     public String getBaseUrl() {
-        return "https://your-bucket.cos.ap-guangzhou.myqcloud.com"; // 示例实现
+//        return "https://wenyang-1359181609.cos.ap-guangzhou.myqcloud.com";
+        // 示例实现
+        return String.format("https://%s.cos.%s.myqcloud.com", cosClientConfig.getBucket(), cosClientConfig.getRegion());
     }
 
 
