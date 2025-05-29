@@ -22,11 +22,11 @@ public class PictureUploadRequest implements Serializable {
      */
     private Long id;
 
-//    /**
-//     * 文件地址
-//     */
-//    private String fileUrl;
-//
+    /**
+     * 文件地址
+     */
+    private String fileUrl;
+
 //    /*
 //        * 图片名称
 //     */

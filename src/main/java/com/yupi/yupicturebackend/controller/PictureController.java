@@ -58,7 +58,7 @@ public class PictureController {
      * @return
      */
     @PostMapping("/upload")
-    @ApiOperation("上传图片")
+    @ApiOperation("通过图片文件上传")
 //    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<PictureVO> uploadPicture(@RequestPart("file") MultipartFile multipartFile,
                                                  PictureUploadRequest pictureUploadRequest,
@@ -68,6 +68,21 @@ public class PictureController {
         PictureVO pictureVO = pictureService.uploadPicture(multipartFile, pictureUploadRequest, loginUser);
         return ResultUtils.success(pictureVO);
     }
+
+    /**
+     * 通过 URL 上传图片（可重新上传）
+     */
+    @PostMapping("/upload/url")
+    @ApiOperation("通过URL上传")
+    public BaseResponse<PictureVO> uploadPictureByUrl(
+            @RequestBody PictureUploadRequest pictureUploadRequest,
+            HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        String fileUrl = pictureUploadRequest.getFileUrl();
+        PictureVO pictureVO = pictureService.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+        return ResultUtils.success(pictureVO);
+    }
+
 
     /**
      * 删除图片

@@ -10,6 +10,9 @@ import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
 import com.yupi.yupicturebackend.exception.ThrowUtils;
 import com.yupi.yupicturebackend.manager.FileManager;
+import com.yupi.yupicturebackend.manager.upload.FilePictureUpload;
+import com.yupi.yupicturebackend.manager.upload.PictureUploadTemplate;
+import com.yupi.yupicturebackend.manager.upload.UrlPictureUpload;
 import com.yupi.yupicturebackend.model.dto.file.UploadPictureResult;
 import com.yupi.yupicturebackend.model.dto.picture.PictureQueryRequest;
 import com.yupi.yupicturebackend.model.dto.picture.PictureReviewRequest;
@@ -44,7 +47,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     implements PictureService{
 
     @Resource
-    private FileManager fileManager;
+    private FilePictureUpload filePictureUpload;
+
+    @Resource
+    private UrlPictureUpload urlPictureUpload;
 
     @Resource
     private UserService userService;
@@ -52,13 +58,15 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     /**
      * 上传图片功能
      * 该方法允许用户上传图片，无论是新增还是更新图片
-     * @param multipartFile 用户选择的图片文件
+     * @param inputSource 用户选择的图片文件
      * @param pictureUploadRequest 包含上传图片的请求信息，如图片ID
      * @param loginUser 当前登录的用户信息，用于验证身份和确定存储路径
      * @return 返回上传后的图片信息，包括URL等
      */
 @Override
-public PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest, User loginUser) {
+public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
+
+    ThrowUtils.throwIf(inputSource == null, ErrorCode.PARAMS_ERROR,"图片为空");
 
     // 校验参数
     ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
@@ -86,7 +94,12 @@ public PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest
     // 上传图片
     // 按照用户id划分目录，以确保用户只能上传图片到自己的目录中
     String uploadPathPrefix = String.format("public/%s", loginUser.getId());
-    UploadPictureResult uploadPictureResult = fileManager.uploadPicture(multipartFile, uploadPathPrefix);
+    // 根据inputSource类型区分上传方式
+    PictureUploadTemplate pictreUploadTemplate = filePictureUpload;
+    if(inputSource instanceof String){
+        pictreUploadTemplate = urlPictureUpload;
+    }
+    UploadPictureResult uploadPictureResult = pictreUploadTemplate.uploadPicture(inputSource, uploadPathPrefix);
     // 构造要入库的图片信息
     Picture picture = getPicture(loginUser, uploadPictureResult, pictureId);
 
