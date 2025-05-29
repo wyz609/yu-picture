@@ -30,7 +30,7 @@ public class PictureVO implements Serializable {
 
     private String introduction;
 
-    private List<String> tages;
+    private List<String> tags;
 
     private String category;
 
@@ -69,7 +69,7 @@ public class PictureVO implements Serializable {
         Picture picture = new Picture();
         BeanUtil.copyProperties(pictureVO, picture);
         // 类型不同， 不需要转换
-        picture.setTags(JSONUtil.toJsonStr(pictureVO.getTages()));
+        picture.setTags(JSONUtil.toJsonStr(pictureVO.getTags()));
         return picture;
     }
 
@@ -86,7 +86,7 @@ public class PictureVO implements Serializable {
         PictureVO pictureVO = new PictureVO();
         BeanUtil.copyProperties(picture,pictureVO);
         // 类型不同，需要转换
-        pictureVO.setTages(JSONUtil.toList(picture.getTags(),String.class));
+        pictureVO.setTags(JSONUtil.toList(picture.getTags(),String.class));
         System.out.println("pictureVO =====> " + pictureVO);
         return pictureVO;
     }
