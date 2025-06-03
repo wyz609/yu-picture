@@ -1,8 +1,12 @@
 package com.yupi.yupicturebackend.controller;
 
+
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yupi.yupicturebackend.annotation.AuthCheck;
 import com.yupi.yupicturebackend.common.BaseResponse;
 import com.yupi.yupicturebackend.common.DeleteRequest;
@@ -16,19 +20,24 @@ import com.yupi.yupicturebackend.model.entity.Picture;
 import com.yupi.yupicturebackend.model.entity.User;
 import com.yupi.yupicturebackend.model.enums.PictureReviewStatusEnum;
 import com.yupi.yupicturebackend.model.vo.PictureVO;
+import com.yupi.yupicturebackend.redis.PictureCacheStrategy;
 import com.yupi.yupicturebackend.service.PictureService;
 import com.yupi.yupicturebackend.service.UserService;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import javax.xml.transform.Result;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Class name: PictureController
@@ -49,6 +58,26 @@ public class PictureController {
 
     @Resource
     private PictureService pictureService;
+
+    // 注入缓存策略接口
+    // 您可以通过 @Qualifier 选择使用哪种缓存策略：
+    // @Resource
+    // @Qualifier("redisPictureCacheStrategy") // 使用 Redis 缓存
+
+    @Resource
+    @Qualifier("caffeinePictureCacheStrategy") // 使用 Caffeine 本地缓存
+    private PictureCacheStrategy pictureCacheStrategy;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    private final Cache<Object, Object> LOCAL_CACHE =
+            Caffeine.newBuilder().initialCapacity(1024)
+                    .maximumSize(10000L)
+                    // 缓存 5 分钟移除
+                    .expireAfterWrite(5L, TimeUnit.MINUTES)
+                    .build();
+
 
     /**
      * 上传图片(可重新上传) 该接口仅管理员可使用
@@ -84,6 +113,19 @@ public class PictureController {
     }
 
 
+    @PostMapping("/upload/batch")
+    @ApiOperation("批量上传图片")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Integer> uploadPictureByBatch(
+            @RequestBody PictureUploadByBatchRequest pictureUploadByBatchRequest,
+            HttpServletRequest request){
+        ThrowUtils.throwIf(pictureUploadByBatchRequest == null , ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        int uploadCount = pictureService.uploadPictureByBatch(pictureUploadByBatchRequest,loginUser);
+        return ResultUtils.success(uploadCount);
+    }
+
+
     /**
      * 删除图片
      * @param deleteRequest
@@ -111,6 +153,8 @@ public class PictureController {
         ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }
+
+
 
     /**
      * 更新图片(仅管理员可用)
@@ -216,6 +260,49 @@ public class PictureController {
                 pictureService.getQueryWrapper(pictureQueryRequest));
         // 获取封装类
         return ResultUtils.success(pictureService.getPictureVOPage(picturePage, request));
+    }
+
+    /**
+     * 分页获取图片列表（封装类） 进行Redis缓存进行优化
+     *  本地缓存的设计和分布式缓存基本一致，但有两个区别：
+     *   1. 本地缓存需要自己创建初始化缓存结构(可以简单理解为自己要进行创建一个 HashMap)
+     *   2. 由于本地缓存本身就是服务器隔离的，而且占用服务器的内存，key可以搞得精简一点，不用再添加项目前缀
+     *
+     */
+    @PostMapping("/list/page/vo/cache")
+    @ApiOperation("分页获取图片列表封装类(添加缓存处理)")
+    public BaseResponse<Page<PictureVO>> listPictureVOByPageWithCache(@RequestBody PictureQueryRequest pictureQueryRequest,
+                                                                      HttpServletRequest request) {
+        long current = pictureQueryRequest.getCurrent();
+        long size = pictureQueryRequest.getPageSize();
+        // 限制爬虫
+        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
+        // 普通用户默认只能查看已过审的数据
+        pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue()); // 假设 PictureReviewStatusEnum 存在
+
+        // 1. 构造缓存 key
+        String cacheKey = pictureCacheStrategy.generateKey(pictureQueryRequest);
+
+        // 2. 从缓存中查询
+        Page<PictureVO> cachedPage = pictureCacheStrategy.get(cacheKey);
+        if (cachedPage != null) {
+            // 如果缓存命中，则返回结果
+            return ResultUtils.success(cachedPage);
+        }
+
+        // 3. 缓存未命中，查询数据库
+        Page<Picture> picturePage = pictureService.page(new Page<>(current, size),
+                pictureService.getQueryWrapper(pictureQueryRequest));
+        // 4. 获取封装类
+        Page<PictureVO> pictureVOPage = pictureService.getPictureVOPage(picturePage, request);
+
+        // 5. 将封装好的图片列表缓存
+        // 设置一个缓存过期时间 5 - 10 分钟随机过期，防止缓存雪崩
+        int cacheExpireTime = 300 + RandomUtil.randomInt(0, 300); // 随机过期时间
+        pictureCacheStrategy.put(cacheKey, pictureVOPage, cacheExpireTime);
+
+        // 6. 返回封装结果
+        return ResultUtils.success(pictureVOPage);
     }
 
 

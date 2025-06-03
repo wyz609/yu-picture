@@ -21,7 +21,11 @@ spring:
     active: local
   config:
     import: optional:classpath:application-local.yml
-
+  redis:
+    database: 3
+    host: 127.0.0.1
+    port: 6379
+    timeout: 5000
 
 mybatis-plus:
   configuration:

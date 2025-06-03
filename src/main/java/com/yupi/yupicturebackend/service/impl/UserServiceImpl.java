@@ -46,7 +46,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return 新用户id
      */
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword) {
+    public long userRegister(String userAccount, String userPassword, String checkPassword,String userName) {
         // 1.校验
         if(StrUtil.hasBlank(userAccount,userPassword,checkPassword)){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"参数不能为空");
@@ -73,7 +73,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         User user = new User();
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptPassword);
-        user.setUserName("刘德华");
+        user.setUserName(userName);
         user.setUserRole(UserRoleEnum.USER.getValue());
         boolean saveResult = this.save(user);
         if(!saveResult){

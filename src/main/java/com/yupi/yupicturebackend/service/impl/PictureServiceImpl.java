@@ -2,7 +2,10 @@ package com.yupi.yupicturebackend.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -16,6 +19,7 @@ import com.yupi.yupicturebackend.manager.upload.UrlPictureUpload;
 import com.yupi.yupicturebackend.model.dto.file.UploadPictureResult;
 import com.yupi.yupicturebackend.model.dto.picture.PictureQueryRequest;
 import com.yupi.yupicturebackend.model.dto.picture.PictureReviewRequest;
+import com.yupi.yupicturebackend.model.dto.picture.PictureUploadByBatchRequest;
 import com.yupi.yupicturebackend.model.dto.picture.PictureUploadRequest;
 import com.yupi.yupicturebackend.model.entity.Picture;
 import com.yupi.yupicturebackend.model.entity.User;
@@ -25,12 +29,25 @@ import com.yupi.yupicturebackend.model.vo.UserVO;
 import com.yupi.yupicturebackend.service.PictureService;
 import com.yupi.yupicturebackend.mapper.PictureMapper;
 import com.yupi.yupicturebackend.service.UserService;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+import org.opencv.core.*;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.photo.Photo;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletRequest;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -42,9 +59,11 @@ import java.util.stream.Collectors;
 * @description 针对表【picture(图片)】的数据库操作Service实现
 * @createDate 2025-05-18 14:11:28
 */
+@Slf4j
 @Service
 public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     implements PictureService{
+
 
     @Resource
     private FilePictureUpload filePictureUpload;
@@ -90,19 +109,24 @@ public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureU
 //                .exists();
 //        ThrowUtils.throwIf(!exists,ErrorCode.NOT_FOUND_ERROR,"图片不存在");
     }
-
     // 上传图片
     // 按照用户id划分目录，以确保用户只能上传图片到自己的目录中
     String uploadPathPrefix = String.format("public/%s", loginUser.getId());
     // 根据inputSource类型区分上传方式
-    PictureUploadTemplate pictreUploadTemplate = filePictureUpload;
+    PictureUploadTemplate pictureUploadTemplate = filePictureUpload;
     if(inputSource instanceof String){
-        pictreUploadTemplate = urlPictureUpload;
+        pictureUploadTemplate = urlPictureUpload;
     }
-    UploadPictureResult uploadPictureResult = pictreUploadTemplate.uploadPicture(inputSource, uploadPathPrefix);
+    UploadPictureResult uploadPictureResult = pictureUploadTemplate.uploadPicture(inputSource, uploadPathPrefix);
     // 构造要入库的图片信息
     Picture picture = getPicture(loginUser, uploadPictureResult, pictureId);
 
+    String picName = uploadPictureResult.getPicName();
+    assert pictureUploadRequest != null;
+    if(StrUtil.isNotBlank(pictureUploadRequest.getPicName())){
+        picName = pictureUploadRequest.getPicName();
+    }
+    picture.setName(picName);
     // 保存或更新图片信息到数据库
     boolean result = this.saveOrUpdate(picture);
     ThrowUtils.throwIf(!result,ErrorCode.OPERATION_ERROR,"图片上传失败");
@@ -110,6 +134,7 @@ public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureU
     // 返回上传后的图片信息
     return PictureVO.objToVo(picture);
 }
+
 
     @Override
     public QueryWrapper<Picture> getQueryWrapper(PictureQueryRequest pictureQueryRequest) {
@@ -338,7 +363,101 @@ public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureU
         }
     }
 
-
+    /**
+ * 批量上传图片，使用爬虫抓取关键字图片进行批量下载
+ * @param pictureUploadByBatchRequest 图片批量上传请求体
+ * @param loginUser 登录用户
+ * @return 图片数量
+ */
+@Override
+public Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser) {
+    System.out.println("批量上传图片");
+    // 获取搜索文本,搜索框关键字
+    String searchText = pictureUploadByBatchRequest.getSearchText();
+    String namePrefix = pictureUploadByBatchRequest.getNamePrefix();
+    if(StrUtil.isBlank(namePrefix)){
+        namePrefix = searchText;
+    }
+    // 格式化数量
+    Integer count = pictureUploadByBatchRequest.getCount();
+    // 校验数量范围，如果超出预设范围则抛出异常
+    ThrowUtils.throwIf(count > 30 || count < 1, ErrorCode.PARAMS_ERROR, "数量超出范围");
+    // 偏移量，可以更具需求动态设置
+    int offset = RandomUtil.randomInt(1000);
+    // 构造要抓取的地址
+    String fetchUrl = String.format("https://cn.bing.com/images/async?q=%s&mmasync=1&first=%d", searchText,offset);
+    Document document;
+    try{
+        // 发送网络请求获取图片页面文档，Bing图片搜索可能对first参数有上限(可能最多翻到1000张图片)，频繁请求可能触发Bing的反爬机制，添加随机化的User-Agent
+        document = Jsoup.connect(fetchUrl)
+                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+                .get();
+    }catch (IOException e){
+        // 如果发生IO异常，则记录错误日志并抛出业务异常
+        log.error("获取图片失败",e);
+        throw new BusinessException(ErrorCode.OPERATION_ERROR,"获取图片失败");
+    }
+    // 获取包含图片的div元素
+    Element div = document.getElementsByClass("dgControl").first();
+    // 如果未找到指定的div元素，则抛出业务异常
+    if(ObjUtil.isNull(div)){
+        throw new BusinessException(ErrorCode.OPERATION_ERROR,"获取元素失败");
+    }
+    // 获取所有图片元素
+//    Elements imgElementList = div.select("img.mimg");
+    Elements imgElementList = div.select(".iusc");
+    int uploadCount = 0;
+    // 遍历图片元素列表
+    for (Element imgElement : imgElementList) {
+        // 获取图片URL
+//        String imgUrl = imgElement.attr("src");
+        // 获取data-m属性中的JSON字符串
+        String dataM = imgElement.attr("m");
+        String imgUrl;
+        try{
+            // 解析JSON字符串并获取图片URL
+            JSONObject jsonObject = JSONUtil.parseObj(dataM);
+            // 获取murl字段(原始图片URL)
+            imgUrl = jsonObject.getStr("murl");
+        }catch (Exception e){
+            // 如果解析失败，则记录错误日志并跳过当前图片
+            log.error("解析图片URL失败",e);
+            continue;
+        }
+        // 如果图片URL为空，则记录日志并跳过当前图片
+        if(StrUtil.isBlank(imgUrl)){
+            log.info("当前链接为空，已跳过:{}",imgUrl);
+            continue;
+        }
+        // 处理图片上传地址，防止出现转义问题
+        int questionMarkIndex = imgUrl.indexOf("?");
+        if(questionMarkIndex > -1){
+            imgUrl = imgUrl.substring(0,questionMarkIndex);
+        }
+        // 创建图片上传请求对象
+        PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+        if(StrUtil.isNotBlank(namePrefix)){
+            // 设置图片名称，序号连续递增
+            pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+        }
+        try{
+            // 调用上传图片方法，如果上传成功则增加上传计数
+            PictureVO pictureVO = this.uploadPicture(imgUrl, pictureUploadRequest, loginUser);
+            log.info("图片上传成功，id={}",pictureVO.getId());
+            uploadCount ++;
+        }catch (Exception e){
+            // 如果上传失败，则记录错误日志并继续处理下一张图片
+            log.error("图片上传失败",e);
+            continue;
+        }
+        // 如果上传成功的图片数量达到预设数量，则停止处理
+        if (uploadCount >= count){
+            break;
+        }
+    }
+    // 返回上传成功的图片数量
+    return uploadCount;
+}
 
 }
 

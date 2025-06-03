@@ -45,24 +45,24 @@ public class UrlPictureUpload extends PictureUploadTemplate {
         ThrowUtils.throwIf(!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://"),
                 ErrorCode.PARAMS_ERROR,"仅支持 HTTP 或 HTTPS 协议的文件地址");
         // 发送 HEAD 请求安装文件是否存在
-        HttpResponse httpResopnse = null;
+        HttpResponse httpResponse = null;
 
         try {
-            httpResopnse = HttpUtil.createRequest(Method.HEAD, fileUrl).execute();
+            httpResponse = HttpUtil.createRequest(Method.HEAD, fileUrl).execute();
 
             // 未正常返回。无法执行其他判断
-            if(httpResopnse.getStatus() != HttpStatus.HTTP_OK){
+            if(httpResponse.getStatus() != HttpStatus.HTTP_OK){
                 return;
             }
             // 文件存在，文件类型校验
-            String contentType = httpResopnse.header("Content-Type");
+            String contentType = httpResponse.header("Content-Type");
             if(StrUtil.isNotBlank(contentType)){
                 final List<String> ALLOW_FORMAT_LIST = Arrays.asList("image/jpeg","image/jpg", "image/png", "image/webp");
                 ThrowUtils.throwIf(!ALLOW_FORMAT_LIST.contains(contentType.toLowerCase()),
                         ErrorCode.PARAMS_ERROR,"文件类型错误");
             }
             // 文件存在， 文件大小校验
-            String contentLengthStr = httpResopnse.header("Content-Length");
+            String contentLengthStr = httpResponse.header("Content-Length");
             if (StrUtil.isNotBlank(contentLengthStr)) {
                 try {
                     long contentLength = Long.parseLong(contentLengthStr);
@@ -74,8 +74,8 @@ public class UrlPictureUpload extends PictureUploadTemplate {
             }
         }finally {
             // 释放资源
-            if (httpResopnse != null) {
-                httpResopnse.close();
+            if (httpResponse != null) {
+                httpResponse.close();
             }
         }
     }
@@ -83,7 +83,7 @@ public class UrlPictureUpload extends PictureUploadTemplate {
     @Override
     protected String getOriginFilename(Object inputSource) {
         String fileUrl = (String) inputSource;
-        return FileUtil.mainName(fileUrl);
+        return FileUtil.mainName(fileUrl) +"." +FileUtil.getSuffix(fileUrl);
     }
 
     @Override
