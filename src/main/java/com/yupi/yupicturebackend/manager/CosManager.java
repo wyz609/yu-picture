@@ -1,16 +1,23 @@
 package com.yupi.yupicturebackend.manager;
 
+import cn.hutool.core.io.FileUtil;
 import com.qcloud.cos.COSClient;
+import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.GetObjectRequest;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.model.PutObjectResult;
 import com.qcloud.cos.model.ciModel.persistence.PicOperations;
 import com.yupi.yupicturebackend.config.CosClientConfig;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.convert.ConversionService;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.io.File;
+import java.util.ArrayList;
+
+import static org.yaml.snakeyaml.nodes.Tag.STR;
 
 /**
  * Class name: CosManager
@@ -32,6 +39,8 @@ public class CosManager {
     // COS客户端对象，用于与COS服务进行交互，用于执行上传、下载等操作
     @Resource
     private COSClient cosClient;
+    @Autowired
+    private ConversionService conversionService;
 
 
     /**
@@ -57,8 +66,29 @@ public class CosManager {
         PicOperations picOperations = new PicOperations();
         // 0 不返回原图信息， 1 返回原图信息， 默认为0
         picOperations.setIsPicInfo(1);
+        ArrayList<PicOperations.Rule> rules = new ArrayList<>();
+
+        //将图片进行压缩处理(转成 webp 格式)
+        String webKey = FileUtil.mainName(key) + ".webp";
+        PicOperations.Rule compressRule = new PicOperations.Rule();
+        compressRule.setRule("imageMogr2/format/webp");
+        compressRule.setBucket(cosClientConfig.getBucket());
+        compressRule.setFileId(webKey);
+        rules.add(compressRule);
+
+        // 缩略图处理 仅对  > 20 KB 的图片生成缩略图
+        if(file.length() > 2 * 1024) {
+            PicOperations.Rule thumbnailRule = new PicOperations.Rule();
+            thumbnailRule.setBucket(cosClientConfig.getBucket());
+            String thumbnailKey = FileUtil.mainName(key) + "_thumbnail." + FileUtil.getSuffix(key);
+            thumbnailRule.setFileId(thumbnailKey);
+            // 缩略图规则化 /thumbnail /<width>x<height> (如果大于原图宽高，则不处理)
+            thumbnailRule.setRule(String.format("imageMogr2/thumbnail/%sx%s>", 128, 128));
+            rules.add(thumbnailRule);
+        }
         // 构造处理参数
         putObjectRequest.setPicOperations(picOperations);
+        picOperations.setRules(rules);
         return cosClient.putObject(putObjectRequest);
     }
 
@@ -79,5 +109,13 @@ public class CosManager {
         return String.format("https://%s.cos.%s.myqcloud.com", cosClientConfig.getBucket(), cosClientConfig.getRegion());
     }
 
+    /**
+     * 删除对象
+     * @param key 文件key
+     * @throws CosClientException
+     */
+    public void deleteObject(String key)throws CosClientException {
+        cosClient.deleteObject(cosClientConfig.getBucket(),key);
+    }
 
 }

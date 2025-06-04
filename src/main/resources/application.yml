@@ -3,6 +3,9 @@ server:
   port: 8001
   servlet:
     context-path: /api
+    session:
+      cookie:
+        max-age: 2592000
 
 #这里配置Spring项目的名称
 spring:
@@ -26,6 +29,10 @@ spring:
     host: 127.0.0.1
     port: 6379
     timeout: 5000
+  session:
+    store-type: redis
+    timeout: 2592000
+
 
 mybatis-plus:
   configuration:

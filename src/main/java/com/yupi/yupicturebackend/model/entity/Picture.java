@@ -216,6 +216,11 @@ public class Picture implements Serializable {
     private Long reviewerId;
 
     /**
+     * 缩略图URL
+     */
+    private String thumbnailUrl;
+
+    /**
      * 审核时间
      */
     private Date reviewTime;

@@ -59,14 +59,15 @@ public class PictureController {
     @Resource
     private PictureService pictureService;
 
-    // 注入缓存策略接口
-    // 您可以通过 @Qualifier 选择使用哪种缓存策略：
-    // @Resource
-    // @Qualifier("redisPictureCacheStrategy") // 使用 Redis 缓存
+//     注入缓存策略接口
+//     您可以通过 @Qualifier 选择使用哪种缓存策略：
+     @Resource
+     @Qualifier("redisPictureCacheStrategy") // 使用 Redis 缓存
+     private PictureCacheStrategy redisPictureCacheStrategy;
 
     @Resource
     @Qualifier("caffeinePictureCacheStrategy") // 使用 Caffeine 本地缓存
-    private PictureCacheStrategy pictureCacheStrategy;
+    private PictureCacheStrategy caffeinePictureCacheStrategy;
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -280,13 +281,26 @@ public class PictureController {
         // 普通用户默认只能查看已过审的数据
         pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue()); // 假设 PictureReviewStatusEnum 存在
 
+        // 使用多级缓存策略，如果本地缓存未命中则在Redis缓存中查询，反之返回查询到的结果，如果Redis缓存中未命中则查询数据库，
+        // 反之返回Redis中查询到的结果，并将结果存入到本地缓存中，查询数据库中的结果将其放入Redis和本地缓存中
+
         // 1. 构造缓存 key
-        String cacheKey = pictureCacheStrategy.generateKey(pictureQueryRequest);
+        String cacheKey = caffeinePictureCacheStrategy.generateKey(pictureQueryRequest);
 
         // 2. 从缓存中查询
-        Page<PictureVO> cachedPage = pictureCacheStrategy.get(cacheKey);
+        Page<PictureVO> cachedPage = caffeinePictureCacheStrategy.get(cacheKey);
         if (cachedPage != null) {
             // 如果缓存命中，则返回结果
+            return ResultUtils.success(cachedPage);
+        }
+
+        // 如果本地缓存未命中则使用Redis缓存
+        String redisCacheKey = redisPictureCacheStrategy.generateKey(pictureQueryRequest);
+
+        cachedPage = redisPictureCacheStrategy.get(redisCacheKey);
+
+        if (cachedPage != null){
+            caffeinePictureCacheStrategy.put(cacheKey, cachedPage,5);
             return ResultUtils.success(cachedPage);
         }
 
@@ -299,8 +313,8 @@ public class PictureController {
         // 5. 将封装好的图片列表缓存
         // 设置一个缓存过期时间 5 - 10 分钟随机过期，防止缓存雪崩
         int cacheExpireTime = 300 + RandomUtil.randomInt(0, 300); // 随机过期时间
-        pictureCacheStrategy.put(cacheKey, pictureVOPage, cacheExpireTime);
-
+        redisPictureCacheStrategy.put(cacheKey, pictureVOPage, cacheExpireTime);
+        caffeinePictureCacheStrategy.put(cacheKey, pictureVOPage, cacheExpireTime);
         // 6. 返回封装结果
         return ResultUtils.success(pictureVOPage);
     }

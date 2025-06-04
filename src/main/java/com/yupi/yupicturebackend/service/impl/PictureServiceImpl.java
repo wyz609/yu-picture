@@ -12,7 +12,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
 import com.yupi.yupicturebackend.exception.ThrowUtils;
-import com.yupi.yupicturebackend.manager.FileManager;
+import com.yupi.yupicturebackend.manager.CosManager;
 import com.yupi.yupicturebackend.manager.upload.FilePictureUpload;
 import com.yupi.yupicturebackend.manager.upload.PictureUploadTemplate;
 import com.yupi.yupicturebackend.manager.upload.UrlPictureUpload;
@@ -30,23 +30,17 @@ import com.yupi.yupicturebackend.service.PictureService;
 import com.yupi.yupicturebackend.mapper.PictureMapper;
 import com.yupi.yupicturebackend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.opencv.core.*;
-import org.opencv.imgcodecs.Imgcodecs;
-import org.opencv.photo.Photo;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
-import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletRequest;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
@@ -73,6 +67,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Resource
     private UserService userService;
+    @Autowired
+    private CosManager cosManager;
 
     /**
      * 上传图片功能
@@ -258,7 +254,7 @@ public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureU
             ThrowUtils.throwIf(url.length() > 1024, ErrorCode.PARAMS_ERROR,"url过长");
         }
         if(StrUtil.isNotBlank(introduction)){
-            ThrowUtils.throwIf(introduction.length() > 100, ErrorCode.PARAMS_ERROR,"简介过长");
+            ThrowUtils.throwIf(introduction.length() > 10000, ErrorCode.PARAMS_ERROR,"简介过长");
         }
     }
 
@@ -295,6 +291,29 @@ public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureU
 
     }
 
+    @Async
+    @Override
+    public void clearPictureFile(Picture oldPicture){
+        // 判断该图片是否被多条记录使用
+        String pictureUrl = oldPicture.getUrl();
+        Long count = this.lambdaQuery()
+                .eq(Picture::getUrl, pictureUrl)
+                .count();
+
+        // 有不止一条记录用到的该图片，则不进行清理
+        if(count > 1){
+            return;
+        }
+        // FIXME 注意，这里的 url 包含了域名， 实际上只要传key值(存储路径) 就够了
+        cosManager.deleteObject(oldPicture.getUrl());
+        String thumbnailUrl = oldPicture.getThumbnailUrl();
+        // 清除缩略图
+        if(StrUtil.isNotBlank(thumbnailUrl)){
+            cosManager.deleteObject(thumbnailUrl);
+        }
+    }
+
+
     /**
      * 根据用户信息和上传图片结果创建或更新图片对象
      *
@@ -322,6 +341,8 @@ public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureU
         picture.setPicFormat(uploadPictureResult.getPicFormat());
         // 设置图片所属的用户ID
         picture.setUserId(loginUser.getId());
+        // 设置缩略图URL
+        picture.setThumbnailUrl(uploadPictureResult.getThumbnailUrl());
 
 
         picture.setPicFormat(uploadPictureResult.getPicFormat());
