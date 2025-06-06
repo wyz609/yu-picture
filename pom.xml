@@ -90,6 +90,21 @@
             <version>3.1.8</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/net.coobird/thumbnailator -->
+        <dependency>
+            <groupId>net.coobird</groupId>
+            <artifactId>thumbnailator</artifactId>
+            <version>0.4.20</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.sejda.imageio/webp-imageio -->
+        <dependency>
+        <groupId>org.sejda.imageio</groupId>
+        <artifactId>webp-imageio</artifactId>
+        <version>0.1.6</version>
+        </dependency>
+
+
         <!-- 腾讯云 cos 服务 -->
         <dependency>
             <groupId>com.qcloud</groupId>

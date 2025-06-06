@@ -221,9 +221,19 @@ public class Picture implements Serializable {
     private String thumbnailUrl;
 
     /**
+     * 预览图URL
+     */
+    private String previewUrl;
+
+    /**
      * 审核时间
      */
     private Date reviewTime;
+
+    /**
+     * 空间id 默认空表示公共图库
+     */
+    private Long spaceId;
 
 
 
